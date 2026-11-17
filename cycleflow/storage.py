@@ -53,6 +53,25 @@ CREATE TABLE IF NOT EXISTS releases (
 CREATE TABLE IF NOT EXISTS batches (
   batch_id TEXT PRIMARY KEY, manifest TEXT NOT NULL, next_line INTEGER NOT NULL,
   total_lines INTEGER NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS goal_versions (
+  goal_id TEXT NOT NULL, product TEXT NOT NULL, version INTEGER NOT NULL,
+  title TEXT NOT NULL, minimum_pass_rate TEXT NOT NULL, plan_id TEXT REFERENCES plans(plan_id),
+  effective_at TEXT NOT NULL, reason TEXT NOT NULL, event_id INTEGER NOT NULL REFERENCES events(id),
+  created_at TEXT NOT NULL, PRIMARY KEY(goal_id, version),
+  UNIQUE(product, version));
+CREATE TABLE IF NOT EXISTS iteration_windows (
+  window_id TEXT PRIMARY KEY, product TEXT NOT NULL,
+  current_version INTEGER NOT NULL, goal_id TEXT NOT NULL, goal_version INTEGER NOT NULL,
+  created_at TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'active');
+CREATE TABLE IF NOT EXISTS window_versions (
+  window_id TEXT NOT NULL REFERENCES iteration_windows(window_id),
+  version INTEGER NOT NULL, product TEXT NOT NULL,
+  window_start TEXT NOT NULL, window_end TEXT NOT NULL,
+  goal_id TEXT NOT NULL, goal_version INTEGER NOT NULL,
+  reason TEXT NOT NULL, supersedes_version INTEGER,
+  event_id INTEGER NOT NULL REFERENCES events(id), created_at TEXT NOT NULL,
+  PRIMARY KEY(window_id, version));
+CREATE INDEX IF NOT EXISTS ix_window_product_time ON iteration_windows(product, window_id);
 """
 
 

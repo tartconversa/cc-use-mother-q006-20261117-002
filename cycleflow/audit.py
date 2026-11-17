@@ -23,6 +23,7 @@ class IntegrityAudit:
             findings.extend(self._job_checks(db, product))
             findings.extend(self._test_checks(db, product))
             findings.extend(self._release_checks(db, product))
+            findings.extend(self._governance_checks(db, product))
             findings.sort(key=lambda item: (item["code"], item["subject"]))
             return {"product": product, "checked_event_head": db.execute(
                 "SELECT COALESCE(MAX(id),0) FROM events").fetchone()[0],
@@ -144,6 +145,55 @@ class IntegrityAudit:
                 findings.append(self._issue("release_fingerprint", release["release_id"]))
             if not report.get("quality", {}).get("publishable"):
                 findings.append(self._issue("release_quality", release["release_id"]))
+        return findings
+
+    def _governance_checks(self, db, product):
+        findings = []
+        window_sql = "SELECT * FROM iteration_windows" + (" WHERE product=?" if product else "")
+        for window in db.execute(window_sql, (product,) if product else ()):
+            window_id = window["window_id"]
+            versions = list(db.execute(
+                "SELECT * FROM window_versions WHERE window_id=? ORDER BY version", (window_id,)))
+            if not versions:
+                findings.append(self._issue("window_without_version", window_id))
+                continue
+            if versions[0]["version"] != 1 or any(
+                    later["version"] != earlier["version"] + 1
+                    for earlier, later in zip(versions, versions[1:])):
+                findings.append(self._issue("window_version_gap", window_id))
+            if window["current_version"] != versions[-1]["version"]:
+                findings.append(self._issue("window_current_version", window_id))
+            if any(row["goal_id"] != window["goal_id"] for row in versions):
+                findings.append(self._issue("window_goal_switch", window_id))
+            for row in versions:
+                goal = db.execute(
+                    "SELECT 1 FROM goal_versions WHERE goal_id=? AND version=?",
+                    (row["goal_id"], row["goal_version"])).fetchone()
+                if goal is None:
+                    findings.append(self._issue("window_goal_missing", f"{window_id}:v{row['version']}"))
+            # Active windows of the same product must not overlap on their current boundary.
+            if window["state"] == "active":
+                current = versions[-1]
+                for other in db.execute(
+                        "SELECT w.window_id,v.window_start,v.window_end FROM iteration_windows w "
+                        "JOIN window_versions v ON v.window_id=w.window_id AND v.version=w.current_version "
+                        "WHERE w.product=? AND w.window_id<>? AND w.state='active'",
+                        (window["product"], window_id)):
+                    if (current["window_start"] < other["window_end"]
+                            and other["window_start"] < current["window_end"]):
+                        findings.append(self._issue("window_overlap", window_id))
+        goal_sql = "SELECT DISTINCT goal_id FROM goal_versions" + (
+            " WHERE product=?" if product else "")
+        for row in db.execute(goal_sql, (product,) if product else ()):
+            goal_id = row["goal_id"]
+            versions = list(db.execute(
+                "SELECT * FROM goal_versions WHERE goal_id=? ORDER BY version", (goal_id,)))
+            if versions[0]["version"] != 1 or any(
+                    later["version"] != earlier["version"] + 1
+                    for earlier, later in zip(versions, versions[1:])):
+                findings.append(self._issue("goal_version_gap", goal_id))
+            if len({row["product"] for row in versions}) != 1:
+                findings.append(self._issue("goal_product_switch", goal_id))
         return findings
 
     @staticmethod

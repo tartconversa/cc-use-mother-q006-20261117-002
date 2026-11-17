@@ -6,8 +6,10 @@ from .design import DesignRules
 from .diagnostics import OperationsView
 from .execution import ExecutionRules
 from .inventory import InventoryRules
+from .iterations import IterationView
 from .ledger import EventLedger
 from .measure import MeasurementRules
+from .planning import PlanningRules
 from .snapshot import ReportShelf
 from .storage import Store
 from .throughput import ThroughputView
@@ -23,6 +25,7 @@ class CycleService:
         self.audit_engine = IntegrityAudit(self.store)
         self.operations = OperationsView(self.store)
         self.throughput = ThroughputView(self.store)
+        self.iterations = IterationView(self.store)
 
     def ingest(self, event):
         return self.ledger.ingest(event)
@@ -97,3 +100,29 @@ class CycleService:
 
     def cohorts(self, product, start, end):
         return self.throughput.cohorts(product, start, end)
+
+    # ----- iteration governance -------------------------------------------
+    def get_window(self, window_id, version=None):
+        with self.store.read() as db:
+            return PlanningRules(db).get_window(window_id, version)
+
+    def list_windows(self, product):
+        with self.store.read() as db:
+            return PlanningRules(db).list_windows(product)
+
+    def get_goal(self, goal_id, version=None):
+        with self.store.read() as db:
+            return PlanningRules(db).get_goal(goal_id, version)
+
+    def list_goals(self, product):
+        with self.store.read() as db:
+            return PlanningRules(db).list_goals(product)
+
+    def iteration_weekly(self, product):
+        return self.iterations.weekly(product)
+
+    def boundary_impact(self, window_id, from_version, to_version=None):
+        return self.iterations.boundary_impact(window_id, from_version, to_version)
+
+    def goal_drift(self, product):
+        return self.iterations.goal_drift(product)

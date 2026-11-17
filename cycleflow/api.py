@@ -129,6 +129,35 @@ def create_app(db_path=None):
     def cohorts(product: str, window_start: str, window_end: str):
         return service.cohorts(product, window_start, window_end)
 
+    # ----- iteration governance: frozen windows, goals, attempt chains -----
+    @app.get("/iterations/{product}/weekly")
+    def iteration_weekly(product: str):
+        return service.iteration_weekly(product)
+
+    @app.get("/iterations/{product}/goals")
+    def list_goals(product: str):
+        return {"product": product, "goals": service.list_goals(product)}
+
+    @app.get("/iterations/goals/{goal_id}")
+    def get_goal(goal_id: str, version: int | None = None):
+        return service.get_goal(goal_id, version)
+
+    @app.get("/iterations/{product}/windows")
+    def list_windows(product: str):
+        return {"product": product, "windows": service.list_windows(product)}
+
+    @app.get("/iterations/windows/{window_id}")
+    def get_window(window_id: str, version: int | None = None):
+        return service.get_window(window_id, version)
+
+    @app.get("/iterations/windows/{window_id}/impact")
+    def boundary_impact(window_id: str, from_version: int, to_version: int | None = None):
+        return service.boundary_impact(window_id, from_version, to_version)
+
+    @app.get("/iterations/{product}/goal-drift")
+    def goal_drift(product: str):
+        return service.goal_drift(product)
+
     @app.post("/releases")
     def publish(body: ReleaseBody):
         return service.publish(body.release_id, body.product, body.window_start, body.window_end,

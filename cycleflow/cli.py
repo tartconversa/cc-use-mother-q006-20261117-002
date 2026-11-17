@@ -40,6 +40,16 @@ def parser():
     publish.add_argument("fingerprint")
     release = sub.add_parser("release")
     release.add_argument("release_id")
+    iterations = sub.add_parser("iterations")
+    iterations.add_argument("product")
+    windows = sub.add_parser("windows")
+    windows.add_argument("product")
+    impact = sub.add_parser("impact")
+    impact.add_argument("window_id")
+    impact.add_argument("from_version", type=int)
+    impact.add_argument("--to-version", type=int)
+    drift = sub.add_parser("goal-drift")
+    drift.add_argument("product")
     return root
 
 
@@ -71,6 +81,14 @@ def main(argv=None):
             result = service.publish(args.release_id, args.product, args.start, args.end, args.fingerprint)
         elif args.command == "release":
             result = service.get_release(args.release_id)
+        elif args.command == "iterations":
+            result = service.iteration_weekly(args.product)
+        elif args.command == "windows":
+            result = service.list_windows(args.product)
+        elif args.command == "impact":
+            result = service.boundary_impact(args.window_id, args.from_version, args.to_version)
+        elif args.command == "goal-drift":
+            result = service.goal_drift(args.product)
         else:
             raise AssertionError(args.command)
     except (DomainError, OSError, ValueError, json.JSONDecodeError) as exc:
